@@ -5,13 +5,13 @@ const { toolDefinitions, handleToolCall } = require("./tools");
 
 const MODEL = "claude-sonnet-4-6";
 
-// Safety cap: prevents infinite loops if Claude keeps requesting tools
+// Claude can chain tool calls indefinitely; this cap keeps a bug from burning your API credits
 const MAX_ITERATIONS = 10;
 
-// Single shared client; reads API key from environment so it's never hardcoded
+// One client instance for the whole process — API key comes from .env, never the source file
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Builds the system prompt, optionally injecting project-specific context from CLAUDE.md
+// The system prompt is Claude's "role brief" sent with every request; CLAUDE.md adds project-specific rules on top
 function loadSystemPrompt() {
   const base =
     "You are devlens, an AI assistant embedded in the user's project directory. " +
@@ -22,17 +22,17 @@ function loadSystemPrompt() {
   const claudeMdPath = path.resolve(process.cwd(), "CLAUDE.md");
   if (!fs.existsSync(claudeMdPath)) return base;
 
-  // Append CLAUDE.md so Claude understands project-specific conventions
+  // Injecting CLAUDE.md lets you customize Claude's behavior per project without touching this file
   const claudeMd = fs.readFileSync(claudeMdPath, "utf-8");
   return `${base}\n\n--- Project context (from CLAUDE.md) ---\n${claudeMd}`;
 }
 
-// Runs one full agentic turn: sends a message, executes any tool calls Claude requests,
-// and loops until Claude gives a plain text reply (or MAX_ITERATIONS is hit)
+// Agentic loop: Claude may ask to run tools several times before giving a final answer;
+// this function keeps driving that cycle until Claude stops requesting tools
 async function chat(userMessage, history) {
 
   const messages = [...history, { role: "user", content: userMessage }];
-  const trace = []; // Records every text block, tool call, and tool result for debugging
+  const trace = []; // Full audit trail of every text block, tool call, and result — useful when debugging
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await client.messages.create({
@@ -43,10 +43,10 @@ async function chat(userMessage, history) {
       messages,
     });
 
-    // Add Claude's response to history so the next iteration has full context
+    // Append Claude's reply to messages so the next API call has the full conversation context
     messages.push({ role: "assistant", content: response.content });
 
-    // Log every block in this response to the trace
+    // response.content is an array of blocks — each is either a "text" reply or a "tool_use" request
     for (const block of response.content) {
       if (block.type === "text") {
         trace.push({ type: "text", text: block.text });
@@ -57,7 +57,7 @@ async function chat(userMessage, history) {
 
     const toolUses = response.content.filter((b) => b.type === "tool_use");
 
-    // No tool calls means Claude is done — return the final text reply
+    // No tool requests in this response means Claude has enough info to answer — exit the loop
     if (toolUses.length === 0) {
       const reply = response.content
         .filter((b) => b.type === "text")
@@ -66,7 +66,7 @@ async function chat(userMessage, history) {
       return { reply, history: messages, trace, iterations: i + 1 };
     }
 
-    // Execute each tool Claude requested and collect the results
+    // Run each tool locally and collect results to send back
     const toolResults = [];
     for (const block of toolUses) {
       const result = await handleToolCall(block.name, block.input);
@@ -74,11 +74,11 @@ async function chat(userMessage, history) {
       trace.push({ type: "tool_result", tool_use_id: block.id, name: block.name, content: result });
     }
 
-    // Feed tool results back as a "user" turn so Claude can continue reasoning
+    // Tool results are sent back as a "user" turn — that's the API contract for the tool-use cycle
     messages.push({ role: "user", content: toolResults });
   }
 
-  // Reached the iteration cap without a plain text reply
+  // Hit the iteration cap — Claude never stopped asking for tools, so we bail out gracefully
   return {
     reply: `(Stopped after ${MAX_ITERATIONS} iterations — Claude kept asking for tools. Task may be incomplete. Raise MAX_ITERATIONS in api.js if this is expected.)`,
     history: messages,
