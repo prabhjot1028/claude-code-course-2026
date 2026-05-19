@@ -104,6 +104,45 @@ The diff between your two commits *is* the assignment — it shows what personal
 
 ---
 
+## Week 2 assignment
+
+This week is about understanding the tool use cycle — how Claude asks your code to do things, and how your code decides whether to honor those requests.
+
+### What to submit
+Push one commit to your fork:
+
+**An existing skill that could help you and why**
+- write a short reflection on why
+- create 'relfections' folder in devlens
+- add reflection to fork as .txt or .md
+  
+**A custom skill for devlens**
+- Create `.claude/skills/[your-skill-name]/SKILL.md`
+- Pick one of these options (or create your own):
+  - `/trace` — trace a tool call (read_file, write_file, etc.) end-to-end through the codebase
+  - `/diagram` — explain the request/response flow for a specific scenario
+  - `/compare` — compare how devlens implements something vs how Claude Code does it
+  - `/explain-gap` — document what you learned by fixing this week's gap
+- Test your skill in Claude Code to make sure it works
+- Commit: `git commit -m "feat: add [skill-name] skill"`
+
+### Standards for a good skill
+Your skill should have:
+1. **Specific description** — Clear enough that Claude knows when to use it
+2. **Clear instructions** — Numbered steps, specific output format
+3. **Examples in the instructions** — Show Claude what good output looks like
+4. **Arguments where needed** — Use `$ARGUMENTS` or `$0, $1, $2` for input
+
+### Tips for writing your skill
+- Read through `tools.js` and `api.js` first to understand what you're explaining
+- Use actual line numbers and file names in your skill instructions
+- Test it multiple times — if Claude's output isn't what you wanted, refine the instructions
+- Make it devlens-specific — it should require understanding this codebase to write it
+
+> **Why devlens-specific?** Generic skills like `/review` can be written without reading any code. Skills like `/trace` or `/diagram` force you to understand how devlens works under the hood. The skill is evidence you understand the tool use cycle.
+
+---
+
 ## Project structure
 
 ```
@@ -115,6 +154,8 @@ devlens/
 │   ├── index.html  # The chat UI
 │   └── style.css   # Styles
 ├── CLAUDE.md     # Your personal context file — fill this in!
+├── .claude/
+│   └── skills/   # Your custom skills live here
 └── .env          # Your API key (never commit this)
 ```
 
