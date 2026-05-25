@@ -1,0 +1,10 @@
+I chose the /security-review skills as it matches my cyber security interests
+It reviews the pending changes on the current git branch specificaly for security vulnerabilities.
+Some of the vulnerabilities it scans for are as follows:
+1. Injection vulnerabilities (SQL, command, XSS)
+2. Secrets or API keys accidentally committed. 
+3. Path traversal issues
+4. Insecure deserialization, missing input validation
+5. Broken access control
+6. Anything from the OWASP Top 10
+
